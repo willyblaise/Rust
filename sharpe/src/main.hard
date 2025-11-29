@@ -1,0 +1,93 @@
+use std::error::Error;
+use yfinance_rs::{Interval, Range, Ticker, YfClient};
+use yfinance_rs::core::conversions::money_to_f64;
+
+/// Calculate mean of a slice
+fn calculate_mean(data: &[f64]) -> f64 {
+    let sum: f64 = data.iter().sum();
+    sum / (data.len() as f64)
+}
+
+/// Calculate standard deviation of a slice
+fn calculate_std_dev(data: &[f64], mean: f64) -> f64 {
+    if data.len() < 2 {
+        return 0.0;
+    }
+    let sum_of_squares: f64 = data.iter().map(|&x| (x - mean).powi(2)).sum();
+    (sum_of_squares / ((data.len() - 1) as f64)).sqrt()
+}
+
+/// Calculate annualised Sharpe ratio
+fn calculate_sharpe_ratio(daily_returns: &[f64], annual_risk_free_rate: f64) -> f64 {
+    const TRADING_DAYS: f64 = 252.0;
+
+    let mean_daily = calculate_mean(daily_returns);
+    let std_daily = calculate_std_dev(daily_returns, mean_daily);
+
+    if std_daily == 0.0 {
+        return f64::INFINITY;
+    }
+
+    let daily_rf = annual_risk_free_rate / TRADING_DAYS;
+    let daily_excess = mean_daily - daily_rf;
+
+    daily_excess / std_daily * TRADING_DAYS.sqrt()
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    // Configuration
+    let ticker_symbol = "XYZ";
+    let annual_risk_free_rate = 0.03;
+
+    // 1. Fetch historical data
+    let client = YfClient::default();
+    let ticker = Ticker::new(&client, ticker_symbol);
+    println!("Fetching historical data for {}...", ticker_symbol);
+
+    let history_data = ticker
+    .history(Some(Range::Y1), Some(Interval::D1), false)
+    .await?;
+
+    // 2. Convert Money to f64
+    let prices: Vec<f64> = history_data
+    .iter()
+    .map(|c| money_to_f64(&c.close))
+    .collect();
+
+    if prices.len() < 2 {
+        eprintln!("Not enough data points to calculate returns.");
+        return Ok(());
+    }
+
+    // 3. Calculate daily returns
+    let daily_returns: Vec<f64> = prices
+    .windows(2)
+    .map(|w| (w[1] - w[0]) / w[0])
+    .collect();
+
+    // 4. Compute metrics
+    let sharpe_ratio = calculate_sharpe_ratio(&daily_returns, annual_risk_free_rate);
+    let mean_daily = calculate_mean(&daily_returns);
+    let std_daily = calculate_std_dev(&daily_returns, mean_daily);
+
+    println!("--- Sharpe Calculator ---");
+    println!("Ticker: {}", ticker_symbol);
+    println!("Data points: {}", daily_returns.len());
+    println!("Annual risk-free rate: {:.2}%", annual_risk_free_rate * 100.0);
+
+    println!("\n[Daily Metrics]");
+    println!("Mean daily return: {:.6}", mean_daily);
+    println!("Daily volatility: {:.6}", std_daily);
+
+    println!("\n[Result]");
+    println!("Annualised Sharpe ratio: {:.4}", sharpe_ratio);
+
+    if sharpe_ratio > 1.0 {
+        println!("Interpretation: Good risk-adjusted return (> 1.0).");
+    } else {
+        println!("Interpretation: Weak risk-adjusted return (< 1.0).");
+    }
+
+    Ok(())
+}

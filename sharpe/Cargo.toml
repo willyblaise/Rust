@@ -1,0 +1,10 @@
+[package]
+name = "sharpe_calculator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Required for asynchronous operations (fetching data)
+tokio = { version = "1", features = ["full"] }
+# The Rust client for the Yahoo Finance API
+yfinance-rs = "0.7"

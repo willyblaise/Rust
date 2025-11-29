@@ -1,0 +1,17 @@
+http POST http://127.0.0.1:3002/people \
+    name="Nicole" \
+    city="Vancouver" \
+    occupation="Developer" \
+    age:=43 \
+    education="MSc"
+
+
+for person in \
+  '{"name":"Alice","city":"New York","occupation":"Engineer","age":29,"education":"BSc"}' \
+  '{"name":"Bobby","city":"London","occupation":"Designer","age":34,"education":"BA"}' \
+  '{"name":"Charleigh","city":"San Francisco","occupation":"Lawyer","age":27,"education":"JD"}' \
+  '{"name":"Dana","city":"Berlin","occupation":"Data Scientist","age":27,"education":"MSc"}' \
+  '{"name":"Ethan","city":"Tokyo","occupation":"Teacher","age":36,"education":"MA"}'; do
+    echo "$person" | http POST http://127.0.0.1:3002/people
+done
+
